@@ -769,8 +769,8 @@ class USPLiteSATAPHY(Module):
             i_CPLLPD          = self.cpllreset,
             o_CPLLLOCK        = self.cplllock,
             i_CPLLLOCKEN      = 1,
-            i_CPLLREFCLKSEL   = 0b111,
-            i_GTGREFCLK       = self.refclk,
+            i_CPLLREFCLKSEL   = 0b001,
+            i_GTREFCLK0       = self.refclk,
 
             # QPLL
             i_QPLL0CLK        = 0,
