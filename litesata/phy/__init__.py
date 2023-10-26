@@ -21,7 +21,8 @@ class LiteSATAPHY(Module, AutoCSR):
     For now, the Kintex7/Zynq(with PL based on K7) PHY is the only one available,
     but the achitecture is modular enough to accept others PHYs.
     """
-    def __init__(self, device, pads, gen, clk_freq, refclk=None, data_width=16, qpll=None, with_csr=True):
+    def __init__(self, device, pads, gen, clk_freq, refclk=None, data_width=16,
+                 qpll=None, gthe4=False, use_gtgrefclk=True, with_csr=True):
         self.pads   = pads
         self.gen    = gen
         self.refclk = refclk
@@ -53,7 +54,7 @@ class LiteSATAPHY(Module, AutoCSR):
         # Kintex/Virtex Ultrascale+
         elif re.match("^xc[kv]u[0-9]+p-", device):
             from litesata.phy.uspsataphy import USPLiteSATAPHYCRG, USPLiteSATAPHY
-            self.submodules.phy = USPLiteSATAPHY(pads, gen, clk_freq, data_width)
+            self.submodules.phy = USPLiteSATAPHY(pads, gen, clk_freq, data_width, use_gtgrefclk=use_gtgrefclk)
             self.submodules.crg = USPLiteSATAPHYCRG(refclk, pads, self.phy, gen)
 
         # ECP5
