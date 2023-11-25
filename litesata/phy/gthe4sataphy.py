@@ -144,10 +144,6 @@ class GTHE4LiteSATAPHY(Module):
         self.txcominit      = Signal()
         self.txcomwake      = Signal()
 
-        # Power-down signals
-        self.rxpd           = Signal()
-        self.txpd           = Signal()
-
         # Config at startup
         div_config = {
             "gen1": 4,
@@ -163,7 +159,7 @@ class GTHE4LiteSATAPHY(Module):
             "gen3": 10.0,
         }
         tx_progdiv_cfg = {16: progdiv[gen], 32: 2. * progdiv[gen]}[data_width]
-        rx_progdiv_cfg = {16: progdiv[gen], 32: 2. * progdiv[gen]}[data_width]
+        rx_progdiv_cfg = 0.  # power down RX divider
 
         # TX Init ----------------------------------------------------------------------------------
         self.submodules.tx_init = tx_init = GTHTXInit(clk_freq, buffer_enable=tx_buffer_enable)
@@ -179,7 +175,7 @@ class GTHE4LiteSATAPHY(Module):
 
         # Specific / Generic signals encoding/decoding ---------------------------------------------
         self.comb += [
-            self.txelecidle.eq(self.tx_idle | self.txpd),
+            self.txelecidle.eq(self.tx_idle),
             self.tx_cominit_ack.eq(self.tx_cominit_stb & self.txcomfinish),
             self.tx_comwake_ack.eq(self.tx_comwake_stb & self.txcomfinish),
             self.rx_cominit_stb.eq(self.rxcominitdet),
@@ -202,12 +198,10 @@ class GTHE4LiteSATAPHY(Module):
 
         # Internals and clock domain crossing ------------------------------------------------------
         # sys_clk --> sata_tx clk
-        txpd       = Signal()
         txelecidle = Signal(reset=1)
         txcominit  = Signal()
         txcomwake  = Signal()
         self.specials += [
-            MultiReg(self.txpd,             txpd, "sata_tx"),
             MultiReg(self.txelecidle, txelecidle, "sata_tx"),
         ]
         self.submodules += [
@@ -238,6 +232,7 @@ class GTHE4LiteSATAPHY(Module):
 
         # GTHE4_CHANNEL instance -------------------------------------------------------------------
         class Open(Signal): pass
+        txsync = Signal()
         rxphaligndone = Signal()
         self.gth_params = dict(
             p_ACJTAG_DEBUG_MODE              = 0b0,
@@ -623,7 +618,7 @@ class GTHE4LiteSATAPHY(Module):
             p_SATA_BURST_VAL                 = 0b100,
             p_SATA_CPLL_CFG                  = "VCO_3000MHZ",
             p_SATA_EIDLE_VAL                 = 0b100,
-            p_SHOW_REALIGN_COMMA             = "TRUE",
+            p_SHOW_REALIGN_COMMA             = "FALSE",
             p_SIM_DEVICE                     = "ULTRASCALE_PLUS",
             p_SIM_MODE                       = "FAST",
             p_SIM_RECEIVER_DETECT_PASS       = "TRUE",
@@ -811,6 +806,9 @@ class GTHE4LiteSATAPHY(Module):
             o_TXPHALIGNDONE        = tx_init.Xxphaligndone,
             i_TXUSERRDY            = tx_init.Xxuserrdy,
             i_TXSYNCMODE           = 1,
+            i_TXSYNCALLIN          = tx_init.Xxphaligndone,
+            o_TXSYNCOUT            = txsync,
+            i_TXSYNCIN             = txsync,
             i_TXDLYBYPASS          = 1 if tx_buffer_enable else 0,
             i_TXPHDLYPD            = 1 if tx_buffer_enable else 0,
 
@@ -826,8 +824,8 @@ class GTHE4LiteSATAPHY(Module):
             i_TXUSRCLK2            = self.txusrclk2,
 
             # Power-Down Ports
-            i_RXPD                 = Replicate(self.rxpd, 2),
-            i_TXPD                 = Replicate(txpd, 2),
+            i_RXPD                 = 0b00,
+            i_TXPD                 = 0b00,
 
             # TX electrical
             i_TXDEEMPH             = 0b00,
