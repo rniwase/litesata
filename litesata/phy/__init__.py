@@ -22,7 +22,7 @@ class LiteSATAPHY(Module, AutoCSR):
     but the achitecture is modular enough to accept others PHYs.
     """
     def __init__(self, device, pads, gen, clk_freq, refclk=None, data_width=16,
-                 qpll=None, gthe4=False, use_gtgrefclk=True, with_csr=True):
+                 qpll=None, gt_type="GTY", use_gtgrefclk=True, with_csr=True):
         self.pads   = pads
         self.gen    = gen
         self.refclk = refclk
@@ -51,11 +51,20 @@ class LiteSATAPHY(Module, AutoCSR):
             self.submodules.phy = USLiteSATAPHY(pads, gen, clk_freq, data_width)
             self.submodules.crg = USLiteSATAPHYCRG(refclk, pads, self.phy, gen)
 
-        # Kintex/Virtex Ultrascale+
-        elif re.match("^xc[kv]u[0-9]+p-", device):
-            from litesata.phy.uspsataphy import USPLiteSATAPHYCRG, USPLiteSATAPHY
-            self.submodules.phy = USPLiteSATAPHY(pads, gen, clk_freq, data_width, use_gtgrefclk=use_gtgrefclk)
-            self.submodules.crg = USPLiteSATAPHYCRG(refclk, pads, self.phy, gen)
+        # Kintex/Virtex/Zynq Ultrascale+
+        elif re.match("^xc([kv]u[0-9]+p-|zu[0-9])", device):
+            if gt_type == "GTY":
+                # GTY transceiver for Virtex/Kintex Ultrascale+
+                from litesata.phy.uspsataphy import USPLiteSATAPHYCRG, USPLiteSATAPHY
+                self.submodules.phy = USPLiteSATAPHY(pads, gen, clk_freq, data_width, use_gtgrefclk=use_gtgrefclk)
+                self.submodules.crg = USPLiteSATAPHYCRG(refclk, pads, self.phy, gen)
+            elif gt_type == "GTH":
+                # GTH transceiver for Kintex/Zynq Ultrascale+
+                from litesata.phy.gthe4sataphy import GTHE4LiteSATAPHYCRG, GTHE4LiteSATAPHY
+                self.submodules.phy = GTHE4LiteSATAPHY(pads, gen, clk_freq, data_width, use_gtgrefclk=use_gtgrefclk)
+                self.submodules.crg = GTHE4LiteSATAPHYCRG(refclk, pads, self.phy, gen)
+            else:
+                raise NotImplementedError(f"Unsupported GT type. : {gt_type}")
 
         # ECP5
         elif re.match("^LFE5UM5G-", device):
