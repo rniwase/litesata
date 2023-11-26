@@ -81,6 +81,8 @@ class LiteSATAPHYCtrl(Module):
             trx.tx_cominit_stb.eq(1),
             If(trx.tx_cominit_ack & ~trx.rx_cominit_stb,
                 NextState("AWAIT-COMINIT")
+            ).Else(
+                retry_timer.wait.eq(1)
             )
         )
         fsm.act("AWAIT-COMINIT",
@@ -110,6 +112,8 @@ class LiteSATAPHYCtrl(Module):
             trx.tx_comwake_stb.eq(1),
             If(trx.tx_comwake_ack,
                 NextState("AWAIT-COMWAKE")
+            ).Else(
+                retry_timer.wait.eq(1)
             )
         )
         fsm.act("AWAIT-COMWAKE",
