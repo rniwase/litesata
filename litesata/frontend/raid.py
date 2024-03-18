@@ -200,9 +200,9 @@ class LiteSATAMirroringTX(Module):
             self.comb += [
                 sink.connect(read, omit=set(["valid", "ready"])),
                 sink.connect(write, omit=set(["valid", "ready"])),
-                read.valid.eq(sink.valid & (sink.read | sink.identify) & ~read_stall),
+                read.valid.eq(sink.valid & (sink.read | sink.identify | sink.smart_read_data) & ~read_stall),
                 write.valid.eq(sink.valid & sink.write),
-                If(sink.read | sink.identify,
+                If(sink.read | sink.identify | sink.smart_read_data,
                     sink.ready.eq((read.ready & ~read_stall))
                 ).Else(
                     sink.ready.eq(write.ready)

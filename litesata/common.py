@@ -222,8 +222,22 @@ def transport_rx_description(dw):
 regs = {
     "WRITE_DMA_EXT":   0x35,
     "READ_DMA_EXT":    0x25,
-    "IDENTIFY_DEVICE": 0xec
+    "IDENTIFY_DEVICE": 0xec,
+    "SMART":           0xb0
 }
+
+feature_smart = {
+    "SMART_READ_DATA":                         0xd0,
+    "SMART_ENABLE_DISABLE_ATTRIBUTE_AUTOSAVE": 0xd2,
+    "SMART_EXECUTE_OFFLINE_IMMEDIATE":         0xd4,
+    "SMART_READ_LOG":                          0xd5,
+    "SMART_WRITE_LOG":                         0xd6,
+    "SMART_ENABLE_OPERATIONS":                 0xd8,
+    "SMART_DISABLE_OPERATIONS":                0xd9,
+    "SMART_RETURN_STATUS":                     0xda
+}
+
+lba_smart = 0xc24f << 8
 
 reg_d2h_status = {
     "bsy":  7,
@@ -243,6 +257,7 @@ def command_tx_description(dw):
         ("write",    1),
         ("read",     1),
         ("identify", 1),
+        ("smart_read_data", 1),
         ("sector",  48),
         ("count",   16)
     ]
@@ -255,6 +270,7 @@ def command_rx_description(dw):
         ("write",    1),
         ("read",     1),
         ("identify", 1),
+        ("smart_read_data", 1),
         ("end",      1),
         ("failed",   1)
     ]

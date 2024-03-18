@@ -13,6 +13,7 @@ tx_to_rx = [
     ("write",    1),
     ("read",     1),
     ("identify", 1),
+    ("smart_read_data", 1),
     ("count",    16)
 ]
 
@@ -33,8 +34,8 @@ class LiteSATACommandTX(Module):
 
         self.comb += [
             transport.sink.pm_port.eq(0),
-            transport.sink.features.eq(0),
-            transport.sink.lba.eq(sink.sector),
+            # transport.sink.features.eq(0),
+            # transport.sink.lba.eq(sink.sector),
             transport.sink.device.eq(0xe0),
             transport.sink.count.eq(sink.count),
             transport.sink.icc.eq(0),
@@ -45,6 +46,7 @@ class LiteSATACommandTX(Module):
         is_write       = Signal()
         is_read        = Signal()
         is_identify    = Signal()
+        is_smart_read_data = Signal()
         dwords_counter = Signal(max=fis_max_dwords)
 
         self.fsm = fsm = FSM(reset_state="IDLE")
@@ -62,6 +64,7 @@ class LiteSATACommandTX(Module):
                 is_write.eq(sink.write),
                 is_read.eq(sink.read),
                 is_identify.eq(sink.identify),
+                is_smart_read_data.eq(sink.smart_read_data),
             )
 
         fsm.act("SEND_CMD",
@@ -105,11 +108,21 @@ class LiteSATACommandTX(Module):
             ).Else(
                 transport.sink.type.eq(fis_types["REG_H2D"]),
                 If(is_write,
-                    transport.sink.command.eq(regs["WRITE_DMA_EXT"])
+                    transport.sink.command.eq(regs["WRITE_DMA_EXT"]),
+                    transport.sink.features.eq(0),
+                    transport.sink.lba.eq(sink.sector)
                 ).Elif(is_read,
                     transport.sink.command.eq(regs["READ_DMA_EXT"]),
+                    transport.sink.features.eq(0),
+                    transport.sink.lba.eq(sink.sector)
+                ).Elif(is_smart_read_data,
+                    transport.sink.command.eq(regs["SMART"]),
+                    transport.sink.features.eq(feature_smart["SMART_READ_DATA"]),
+                    transport.sink.lba.eq(lba_smart)
                 ).Else(
                     transport.sink.command.eq(regs["IDENTIFY_DEVICE"]),
+                    transport.sink.features.eq(0),
+                    transport.sink.lba.eq(sink.sector)
                 )
             )
         self.comb += [
@@ -117,6 +130,7 @@ class LiteSATACommandTX(Module):
                 to_rx.write.eq(sink.write),
                 to_rx.read.eq(sink.read),
                 to_rx.identify.eq(sink.identify),
+                to_rx.smart_read_data.eq(sink.smart_read_data),
                 to_rx.count.eq(sink.count)
             )
         ]
@@ -139,6 +153,7 @@ class LiteSATACommandRX(Module):
             return transport.source.type == fis_types[name]
 
         is_identify     = Signal()
+        is_smart_read_data = Signal()
         is_dma_activate = Signal()
         read_ndwords    = Signal(max=sectors2dwords(2**16))
         dwords_counter  = Signal(max=sectors2dwords(2**16))
@@ -188,13 +203,14 @@ class LiteSATACommandRX(Module):
                 NextState("WAIT_WRITE_ACTIVATE_OR_REG_D2H")
             ).Elif(from_tx.read,
                 NextState("WAIT_READ_DATA_OR_REG_D2H"),
-            ).Elif(from_tx.identify,
+            ).Elif(from_tx.identify | from_tx.smart_read_data,
                 NextState("WAIT_PIO_SETUP_D2H"),
             )
         )
         self.sync += \
             If(fsm.ongoing("IDLE"),
-                is_identify.eq(from_tx.identify)
+                is_identify.eq(from_tx.identify),
+                is_smart_read_data.eq(from_tx.smart_read_data),
             )
         fsm.act("WAIT_WRITE_ACTIVATE_OR_REG_D2H",
             transport.source.ready.eq(1),
@@ -253,16 +269,17 @@ class LiteSATACommandRX(Module):
             set_read_error.eq(transport.source.error),
             source.valid.eq(transport.source.valid),
             source.last.eq(transport.source.last),
-            source.read.eq(~is_identify),
+            source.read.eq(~(is_identify | is_smart_read_data)),
             source.identify.eq(is_identify),
+            source.smart_read_data.eq(is_smart_read_data),
             source.failed.eq(transport.source.error),
-            source.end.eq(is_identify),
+            source.end.eq(is_identify | is_smart_read_data),
             source.data.eq(transport.source.data),
             transport.source.ready.eq(source.ready),
             If(source.valid & source.ready,
                 If(~read_done, NextValue(dwords_counter, dwords_counter + 1)),
                 If(source.last,
-                    If(is_identify,
+                    If(is_identify | is_smart_read_data,
                         NextState("IDLE")
                     ).Else(
                         NextState("WAIT_READ_DATA_OR_REG_D2H")
